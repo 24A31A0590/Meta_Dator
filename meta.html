@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>MetaExtract · File Metadata Viewer</title>
+    <!-- Font Awesome 6 (free) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"/>
+    <!-- EXIF.js library from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        body {
+            background: #f2f6fe;
+            padding: 30px 20px 60px;
+            color: #0b1e30;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+        }
+
+        .app-container {
+            max-width: 1100px;
+            width: 100%;
+        }
+
+        /* header */
+        .header {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px 24px;
+            margin-bottom: 32px;
+            background: white;
+            padding: 18px 30px;
+            border-radius: 60px;
+            box-shadow: 0 8px 28px rgba(0, 20, 40, 0.04);
+            border: 1px solid #e6edf6;
+        }
+
+        .header h1 {
+            font-size: 26px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+            background: linear-gradient(145deg, #0f2d47, #1e5a7c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header h1 i {
+            background: #173f5c;
+            color: #c3def5;
+            padding: 8px 12px;
+            border-radius: 50px;
+            font-size: 20px;
+            -webkit-text-fill-color: #d5ebff;
+        }
+
+        .header-right {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
+        .file-drop-zone {
+            background: #f0f7ff;
+            border: 2px dashed #b8d1e8;
+            border-radius: 40px;
+            padding: 12px 28px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            cursor: pointer;
+            transition: 0.2s;
+            color: #1d4e72;
+        }
+
+        .file-drop-zone:hover {
+            background: #e6f0fc;
+            border-color: #7fa6c9;
+        }
+
+        .file-drop-zone i {
+            font-size: 22px;
+            color: #2a6a92;
+        }
+
+        .file-drop-zone input[type="file"] {
+            display: none;
+        }
+
+        .file-badge {
+            background: #dce8f3;
+            padding: 6px 18px;
+            border-radius: 40px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #16415f;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .file-badge i {
+            font-size: 14px;
+        }
+
+        /* main grid */
+        .grid-2col {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 28px;
+        }
+
+        @media (max-width: 780px) {
+            .grid-2col {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* preview card */
+        .preview-card {
+            background: white;
+            border-radius: 32px;
+            padding: 24px 24px 28px;
+            border: 1px solid #e6eff7;
+            box-shadow: 0 8px 24px rgba(0, 20, 30, 0.02);
+        }
+
+        .preview-card h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1f4b6b;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .preview-card h3 i {
+            color: #3c7aa3;
+        }
+
+        .preview-box {
+            background: #fafdff;
+            border-radius: 24px;
+            border: 1px solid #e9f0f8;
+            min-height: 220px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            text-align: center;
+            transition: 0.15s;
+        }
+
+        .preview-box img {
+            max-width: 100%;
+            max-height: 360px;
+            border-radius: 16px;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+            object-fit: contain;
+        }
+
+        .preview-box .pdf-icon {
+            font-size: 80px;
+            color: #c14242;
+            opacity: 0.7;
+        }
+
+        .preview-box .placeholder-icon {
+            font-size: 68px;
+            color: #b6cfe3;
+            margin-bottom: 12px;
+        }
+
+        .preview-box .file-name {
+            font-weight: 500;
+            color: #12364e;
+            margin-top: 8px;
+            word-break: break-all;
+        }
+
+        .preview-box .file-type-badge {
+            background: #deeaf5;
+            padding: 4px 18px;
+            border-radius: 40px;
+            font-size: 13px;
+            margin-top: 6px;
+            color: #15415f;
+        }
+
+        /* metadata table */
+        .meta-card {
+            background: white;
+            border-radius: 32px;
+            padding: 24px 24px 18px;
+            border: 1px solid #e6eff7;
+            box-shadow: 0 8px 24px rgba(0, 20, 30, 0.02);
+        }
+
+        .meta-card h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1f4b6b;
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .meta-card h3 i {
+            color: #3c7aa3;
+        }
+
+        .meta-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .meta-table tr {
+            border-bottom: 1px solid #ecf3fa;
+        }
+
+        .meta-table tr:last-child {
+            border-bottom: none;
+        }
+
+        .meta-table td {
+            padding: 12px 6px 12px 0;
+            vertical-align: top;
+        }
+
+        .meta-table .label {
+            font-weight: 500;
+            color: #3d6482;
+            width: 38%;
+            letter-spacing: 0.2px;
+        }
+
+        .meta-table .value {
+            color: #0d2b41;
+            word-break: break-word;
+        }
+
+        .meta-table .value i {
+            color: #618aac;
+            margin-right: 4px;
+        }
+
+        .empty-meta {
+            color: #6b8ba8;
+            padding: 30px 10px;
+            text-align: center;
+        }
+
+        .empty-meta i {
+            font-size: 42px;
+            color: #c2d6e9;
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        /* exif section */
+        .exif-section {
+            margin-top: 18px;
+            border-top: 2px dashed #e1ebf5;
+            padding-top: 16px;
+        }
+
+        .exif-section h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #2b5d7e;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .exif-section h4 i {
+            color: #3d7da5;
+        }
+
+        .exif-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px 18px;
+            font-size: 13px;
+        }
+
+        .exif-grid .exif-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid #f0f6fc;
+        }
+
+        .exif-grid .exif-item .exif-label {
+            color: #3f6a89;
+            font-weight: 450;
+        }
+
+        .exif-grid .exif-item .exif-value {
+            color: #12344d;
+            font-weight: 500;
+        }
+
+        /* utilities */
+        .badge-success {
+            background: #dff0e6;
+            color: #1b6344;
+            padding: 2px 14px;
+            border-radius: 40px;
+            font-size: 12px;
+        }
+
+        .text-muted {
+            color: #6d8aa6;
+            font-size: 13px;
+        }
+
+        .mt-3 { margin-top: 16px; }
+
+        /* responsive */
+        @media (max-width: 480px) {
+            .header { padding: 14px 18px; border-radius: 30px; }
+            .header h1 { font-size: 20px; }
+            .file-drop-zone { padding: 10px 16px; font-size: 14px; }
+            .meta-table td { padding: 10px 4px 10px 0; }
+            .exif-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- header -->
+    <div class="header">
+        <h1><i class="fas fa-file-alt"></i> MetaExtract</h1>
+        <div class="header-right">
+            <div class="file-drop-zone" id="fileDropZone">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <span>Upload file</span>
+                <input type="file" id="fileInput" accept="image/*,application/pdf" />
+            </div>
+            <span class="file-badge" id="fileBadge"><i class="fas fa-info-circle"></i> No file</span>
+        </div>
+    </div>
+
+    <!-- main -->
+    <div class="grid-2col">
+        <!-- left: preview -->
+        <div class="preview-card">
+            <h3><i class="fas fa-eye"></i> Preview</h3>
+            <div class="preview-box" id="previewBox">
+                <i class="fas fa-file-image placeholder-icon"></i>
+                <div class="file-name" id="previewFileName">No file loaded</div>
+                <div class="file-type-badge" id="previewFileType">—</div>
+            </div>
+            <!-- quick file info -->
+            <div style="margin-top:14px; display:flex; flex-wrap:wrap; gap:10px; justify-content:center; font-size:13px; color:#326184;">
+                <span id="fileSizeDisplay"><i class="far fa-file"></i> Size: —</span>
+                <span id="fileMimeDisplay"><i class="fas fa-tag"></i> MIME: —</span>
+                <span id="fileModifiedDisplay"><i class="far fa-calendar-alt"></i> Modified: —</span>
+            </div>
+        </div>
+
+        <!-- right: metadata -->
+        <div class="meta-card">
+            <h3><i class="fas fa-table"></i> Metadata</h3>
+            <div id="metadataContainer">
+                <div class="empty-meta">
+                    <i class="fas fa-upload"></i>
+                    <p>Upload an image or PDF to see metadata</p>
+                    <span class="text-muted">Supports JPEG, PNG, WebP, PDF</span>
+                </div>
+            </div>
+            <!-- EXIF section (appended inside metadata) -->
+        </div>
+    </div>
+
+    <!-- small footer note -->
+    <div style="margin-top:36px; text-align:center; color:#6e8aa6; font-size:13px; border-top:1px solid #dde8f2; padding-top:20px;">
+        <i class="fas fa-camera"></i> EXIF data extracted via Exif.js &nbsp;·&nbsp; <i class="fas fa-file-pdf"></i> PDF metadata via File API
+    </div>
+</div>
+
+<script>
+    (function() {
+        'use strict';
+
+        // DOM refs
+        const fileInput = document.getElementById('fileInput');
+        const fileDropZone = document.getElementById('fileDropZone');
+        const fileBadge = document.getElementById('fileBadge');
+        const previewBox = document.getElementById('previewBox');
+        const previewFileName = document.getElementById('previewFileName');
+        const previewFileType = document.getElementById('previewFileType');
+        const fileSizeDisplay = document.getElementById('fileSizeDisplay');
+        const fileMimeDisplay = document.getElementById('fileMimeDisplay');
+        const fileModifiedDisplay = document.getElementById('fileModifiedDisplay');
+        const metadataContainer = document.getElementById('metadataContainer');
+
+        // helper: format bytes
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1048576).toFixed(2) + ' MB';
+        }
+
+        // helper: format date
+        function formatDate(dateObj) {
+            if (!dateObj) return '—';
+            try {
+                return dateObj.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+            } catch { return '—'; }
+        }
+
+        // clear metadata
+        function clearMetadata() {
+            metadataContainer.innerHTML = `
+                <div class="empty-meta">
+                    <i class="fas fa-upload"></i>
+                    <p>Upload an image or PDF to see metadata</p>
+                    <span class="text-muted">Supports JPEG, PNG, WebP, PDF</span>
+                </div>
+            `;
+        }
+
+        // ----- render metadata from file -----
+        function renderMetadata(file) {
+            if (!file) {
+                clearMetadata();
+                return;
+            }
+
+            const fileSize = file.size;
+            const mimeType = file.type || 'unknown';
+            const lastModified = file.lastModified ? new Date(file.lastModified) : null;
+
+            // update preview
+            previewFileName.textContent = file.name || 'unnamed';
+            previewFileType.textContent = mimeType || 'unknown';
+            fileSizeDisplay.innerHTML = `<i class="far fa-file"></i> Size: ${formatSize(fileSize)}`;
+            fileMimeDisplay.innerHTML = `<i class="fas fa-tag"></i> MIME: ${mimeType}`;
+            fileModifiedDisplay.innerHTML = `<i class="far fa-calendar-alt"></i> Modified: ${formatDate(lastModified)}`;
+
+            // file badge
+            fileBadge.innerHTML = `<i class="fas fa-check-circle" style="color:#1f7b4a;"></i> ${file.name}`;
+
+            // preview image / pdf
+            const isImage = mimeType.startsWith('image/');
+            const isPDF = mimeType === 'application/pdf';
+
+            if (isImage) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewBox.innerHTML = `
+                        <img src="${e.target.result}" alt="${file.name}" />
+                        <div class="file-name" style="margin-top:12px;">${file.name}</div>
+                        <div class="file-type-badge">${mimeType}</div>
+                    `;
+                };
+                reader.readAsDataURL(file);
+            } else if (isPDF) {
+                previewBox.innerHTML = `
+                    <i class="fas fa-file-pdf pdf-icon"></i>
+                    <div class="file-name" style="margin-top:10px;">${file.name}</div>
+                    <div class="file-type-badge">PDF document</div>
+                `;
+            } else {
+                previewBox.innerHTML = `
+                    <i class="fas fa-file placeholder-icon"></i>
+                    <div class="file-name">${file.name}</div>
+                    <div class="file-type-badge">${mimeType || 'unknown'}</div>
+                `;
+            }
+
+            // ---- build metadata table ----
+            let metaHtml = `
+                <table class="meta-table">
+                    <tr><td class="label"><i class="fas fa-font"></i> File name</td><td class="value">${escapeHtml(file.name)}</td></tr>
+                    <tr><td class="label"><i class="fas fa-weight-hanging"></i> File size</td><td class="value">${formatSize(fileSize)}</td></tr>
+                    <tr><td class="label"><i class="fas fa-tag"></i> MIME type</td><td class="value">${escapeHtml(mimeType)}</td></tr>
+            `;
+
+            // dimensions for image (only if image)
+            if (isImage) {
+                // we'll try to get dimensions from EXIF or from image object
+                // but we can also use a temporary image to get natural dimensions
+                const img = new Image();
+                const objectUrl = URL.createObjectURL(file);
+                img.onload = function() {
+                    // update dimensions in the table after load
+                    const dims = `${img.naturalWidth} × ${img.naturalHeight}`;
+                    const dimCell = document.querySelector('#metaDimValue');
+                    if (dimCell) dimCell.textContent = dims;
+                    URL.revokeObjectURL(objectUrl);
+                };
+                img.onerror = function() { URL.revokeObjectURL(objectUrl); };
+                img.src = objectUrl;
+
+                metaHtml += `
+                    <tr><td class="label"><i class="fas fa-arrows-alt"></i> Dimensions</td><td class="value" id="metaDimValue">loading…</td></tr>
+                `;
+            } else if (isPDF) {
+                metaHtml += `
+                    <tr><td class="label"><i class="fas fa-arrows-alt"></i> Dimensions</td><td class="value">— (PDF)</td></tr>
+                `;
+            } else {
+                metaHtml += `
+                    <tr><td class="label"><i class="fas fa-arrows-alt"></i> Dimensions</td><td class="value">—</td></tr>
+                `;
+            }
+
+            // creation / modification
+            if (lastModified) {
+                metaHtml += `
+                    <tr><td class="label"><i class="far fa-calendar-alt"></i> Modified</td><td class="value">${formatDate(lastModified)}</td></tr>
+                `;
+            } else {
+                metaHtml += `
+                    <tr><td class="label"><i class="far fa-calendar-alt"></i> Modified</td><td class="value">—</td></tr>
+                `;
+            }
+
+            metaHtml += `</table>`;
+
+            // ---- EXIF section (only for images) ----
+            let exifHtml = '';
+            if (isImage) {
+                exifHtml = `<div class="exif-section"><h4><i class="fas fa-camera-retro"></i> EXIF Data</h4><div class="exif-grid" id="exifGrid"><div class="text-muted" style="grid-column:1/-1; padding:8px 0;">Loading EXIF…</div></div></div>`;
+            } else if (isPDF) {
+                exifHtml = `<div class="exif-section"><h4><i class="fas fa-file-pdf"></i> PDF Info</h4><div class="text-muted">PDF metadata (if any) is shown above.</div></div>`;
+            } else {
+                exifHtml = `<div class="exif-section"><h4><i class="fas fa-info-circle"></i> Additional</h4><div class="text-muted">No EXIF data available for this file type.</div></div>`;
+            }
+
+            // put together
+            metadataContainer.innerHTML = metaHtml + exifHtml;
+
+            // ---- EXIF extraction ----
+            if (isImage) {
+                EXIF.getData(file, function() {
+                    const exifGrid = document.getElementById('exifGrid');
+                    if (!exifGrid) return;
+
+                    const allTags = EXIF.getAllTags(this);
+                    const exifItems = [];
+
+                    // camera model
+                    if (allTags.Model) exifItems.push({ label: 'Camera Model', value: allTags.Model });
+                    if (allTags.Make) exifItems.push({ label: 'Make', value: allTags.Make });
+                    if (allTags.DateTime) exifItems.push({ label: 'Date/Time', value: allTags.DateTime });
+                    if (allTags.ExposureTime) {
+                        let exp = allTags.ExposureTime;
+                        if (typeof exp === 'number') exp = exp < 1 ? `1/${Math.round(1/exp)}` : exp + 's';
+                        exifItems.push({ label: 'Exposure', value: exp });
+                    }
+                    if (allTags.FNumber) exifItems.push({ label: 'Aperture', value: 'f/' + allTags.FNumber });
+                    if (allTags.ISOSpeedRatings) exifItems.push({ label: 'ISO', value: allTags.ISOSpeedRatings });
+                    if (allTags.FocalLength) exifItems.push({ label: 'Focal Length', value: allTags.FocalLength + ' mm' });
+                    if (allTags.GPSLatitude) {
+                        const lat = allTags.GPSLatitude;
+                        const latRef = allTags.GPSLatitudeRef || '';
+                        const latStr = lat ? lat[0] + '° ' + lat[1] + "' " + lat[2] + '" ' + latRef : null;
+                        if (latStr) exifItems.push({ label: 'GPS Latitude', value: latStr });
+                    }
+                    if (allTags.GPSLongitude) {
+                        const lon = allTags.GPSLongitude;
+                        const lonRef = allTags.GPSLongitudeRef || '';
+                        const lonStr = lon ? lon[0] + '° ' + lon[1] + "' " + lon[2] + '" ' + lonRef : null;
+                        if (lonStr) exifItems.push({ label: 'GPS Longitude', value: lonStr });
+                    }
+                    if (allTags.GPSAltitude) {
+                        const alt = allTags.GPSAltitude;
+                        exifItems.push({ label: 'GPS Altitude', value: alt + ' m' });
+                    }
+
+                    if (exifItems.length === 0) {
+                        exifGrid.innerHTML = `<div class="text-muted" style="grid-column:1/-1; padding:6px 0;">No EXIF metadata found.</div>`;
+                        return;
+                    }
+
+                    let gridHtml = '';
+                    exifItems.forEach(item => {
+                        gridHtml += `
+                            <div class="exif-item">
+                                <span class="exif-label">${escapeHtml(item.label)}</span>
+                                <span class="exif-value">${escapeHtml(item.value)}</span>
+                            </div>
+                        `;
+                    });
+                    exifGrid.innerHTML = gridHtml;
+                });
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        // ----- handle file -----
+        function handleFile(file) {
+            if (!file) return;
+            // validate
+            const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/bmp', 'application/pdf'];
+            if (!validTypes.includes(file.type)) {
+                alert('Please upload a supported file: JPEG, PNG, WebP, GIF, BMP, or PDF.');
+                return;
+            }
+            renderMetadata(file);
+        }
+
+        // ----- event listeners -----
+        fileInput.addEventListener('change', function(e) {
+            if (this.files.length > 0) {
+                handleFile(this.files[0]);
+            }
+            this.value = ''; // allow re-upload same file
+        });
+
+        // drag & drop
+        fileDropZone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.style.background = '#e3f0fd';
+            this.style.borderColor = '#4a8ab5';
+        });
+
+        fileDropZone.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            this.style.background = '#f0f7ff';
+            this.style.borderColor = '#b8d1e8';
+        });
+
+        fileDropZone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.style.background = '#f0f7ff';
+            this.style.borderColor = '#b8d1e8';
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+                // update file input for consistency
+                const dt = new DataTransfer();
+                dt.items.add(files[0]);
+                fileInput.files = dt.files;
+            }
+        });
+
+        fileDropZone.addEventListener('click', function() {
+            fileInput.click();
+        });
+
+        // init empty
+        clearMetadata();
+    })();
+</script>
+</body>
+</html>
